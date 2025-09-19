@@ -1,0 +1,17 @@
+{
+  "positive_prompt": "A professional woman passionately talking in office setting",
+  "negative_prompt": "bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background",
+  "workflow_params": {
+    "temperature": 0.8,
+    "top_k": 30,
+    "top_p": 0.8,
+    "num_beams": 3
+  },
+  "description": "专业女白领角色，适合商务、办公场景的数字人播报",
+  "tags": [
+    "女白领",
+    "商务",
+    "办公",
+    "专业"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "positive_prompt": "A professional male news anchor talking confidently",
+  "negative_prompt": "bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background",
+  "workflow_params": {
+    "temperature": 0.8,
+    "top_k": 30,
+    "top_p": 0.8,
+    "num_beams": 3
+  },
+  "description": "专业男主播角色，适合新闻播报、主持等正式场合",
+  "tags": [
+    "男主播",
+    "新闻",
+    "主持",
+    "正式"
+  ]
+}
