@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(uv init:*)",
+      "Bash(uv add:*)",
+      "Bash(UV_HTTP_TIMEOUT=120 uv add:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "mcp__local-ip-server__get_local_machine_ip",
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(uv sync:*)",
+      "mcp__txt2voice_server__txt2voice",
+      "Bash(git init:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "local-ip-server"
+  ]
+}
