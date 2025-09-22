@@ -329,7 +329,7 @@ class DigitalHumanWorkflowClient:
             for node_id, node_output in result['outputs'].items():
                 files = []
 
-                # 检查视频文件
+                # 检查视频文件 (标准格式)
                 if 'videos' in node_output:
                     for video in node_output['videos']:
                         video_url = f"http://{self.server_address}/view?filename={video['filename']}&type={video['type']}"
@@ -340,7 +340,18 @@ class DigitalHumanWorkflowClient:
                             'subfolder': video.get('subfolder', '')
                         })
 
-                # 检查音频文件
+                # 检查GIF文件 (可能出现在节点31)
+                if 'gifs' in node_output:
+                    for gif in node_output['gifs']:
+                        gif_url = f"http://{self.server_address}/view?filename={gif['filename']}&type={gif['type']}"
+                        files.append({
+                            'type': 'gif',
+                            'filename': gif['filename'],
+                            'url': gif_url,
+                            'subfolder': gif.get('subfolder', '')
+                        })
+
+                # 检查音频文件 (标准格式)
                 if 'audios' in node_output:
                     for audio in node_output['audios']:
                         audio_url = f"http://{self.server_address}/view?filename={audio['filename']}&type={audio['type']}"
@@ -350,6 +361,31 @@ class DigitalHumanWorkflowClient:
                             'url': audio_url,
                             'subfolder': audio.get('subfolder', '')
                         })
+
+                # 检查VHS VideoCombine输出 (节点31的特殊格式)
+                if 'value' in node_output and isinstance(node_output['value'], dict):
+                    value = node_output['value']
+                    if 'filename' in value:
+                        file_url = f"http://{self.server_address}/view?filename={value['filename']}&type={value.get('type', 'output')}"
+                        files.append({
+                            'type': value.get('type', 'video'),
+                            'filename': value['filename'],
+                            'url': file_url,
+                            'subfolder': value.get('subfolder', '')
+                        })
+
+                # 检查其他可能的文件输出格式
+                for key in node_output.keys():
+                    if key not in ['videos', 'gifs', 'audios', 'value'] and isinstance(node_output[key], list):
+                        for item in node_output[key]:
+                            if isinstance(item, dict) and 'filename' in item:
+                                file_url = f"http://{self.server_address}/view?filename={item['filename']}&type={item.get('type', 'output')}"
+                                files.append({
+                                    'type': item.get('type', 'unknown'),
+                                    'filename': item['filename'],
+                                    'url': file_url,
+                                    'subfolder': item.get('subfolder', '')
+                                })
 
                 if files:
                     output_files[node_id] = files
@@ -446,7 +482,7 @@ class DigitalHumanGenerator:
                  output_dir: str = "outputs"):
         self.character_manager = CharacterManager(characters_dir)
         self.workflow_client = DigitalHumanWorkflowClient(server_address)
-        self.default_workflow = "voice-video-04-api.json"
+        self.default_workflow = "./workflows/voice-video-final-api.json"
         self.output_dir = output_dir
         self.server_address = server_address
         self.logger = logging.getLogger(__name__)
@@ -648,8 +684,8 @@ class DigitalHumanGenerator:
         self.logger.info(f"工作流参数设置完成: {character_info.name}")
         return params
     
-    def monitor_progress_only(self, prompt_id: str, timeout: int = 600, auto_download: bool = True, output_dir: str = "outputs") -> bool:
-        """监控任务进度，并在完成后自动下载结果"""
+    def monitor_progress_only(self, prompt_id: str, timeout: int = 600, auto_download: bool = True, output_dir: str = "outputs", continuous: bool = False) -> bool:
+        """监控任务进度，默认只检查状态，可选择持续监控"""
         print(f"🔍 检查任务状态 - Prompt ID: {prompt_id}")
         
         # 首先检查任务状态
@@ -672,17 +708,37 @@ class DigitalHumanGenerator:
             with urllib.request.urlopen(queue_url) as response:
                 queue_data = json.loads(response.read().decode('utf-8'))
                 
+                # 统计队列信息
+                running_count = len(queue_data.get('queue_running', []))
+                pending_count = len(queue_data.get('queue_pending', []))
+                queue_position = None
+                
                 # 检查正在执行的任务
-                for item in queue_data.get('queue_running', []):
+                for i, item in enumerate(queue_data.get('queue_running', [])):
                     if len(item) > 1 and item[1] == prompt_id:
-                        print("🔄 任务正在运行，开始监控...")
-                        return self.poll_for_completion(prompt_id, timeout, auto_download, output_dir)
+                        print(f"🔄 任务正在运行中")
+                        print(f"📊 队列状态: 执行中 {running_count} | 等待中 {pending_count}")
+                        if continuous:
+                            print("开始持续监控...")
+                            return self.poll_for_completion(prompt_id, timeout, auto_download, output_dir)
+                        else:
+                            print("💡 使用 --continuous 参数进行持续监控")
+                            return True
                 
                 # 检查等待队列
-                for item in queue_data.get('queue_pending', []):
+                for i, item in enumerate(queue_data.get('queue_pending', [])):
                     if len(item) > 1 and item[1] == prompt_id:
-                        print("🔄 任务在等待队列中，开始监控...")
-                        return self.poll_for_completion(prompt_id, timeout, auto_download, output_dir)
+                        queue_position = i + 1
+                        print(f"⏳ 任务在等待队列中 (位置: {queue_position}/{pending_count})")
+                        print(f"📊 队列状态: 执行中 {running_count} | 等待中 {pending_count}")
+                        if queue_position <= 3:
+                            print(f"⏰ 预计等待时间: 约 {queue_position * 2} 分钟")
+                        if continuous:
+                            print("开始持续监控...")
+                            return self.poll_for_completion(prompt_id, timeout, auto_download, output_dir)
+                        else:
+                            print("💡 使用 --continuous 参数进行持续监控")
+                            return True
         except:
             pass
         
@@ -693,8 +749,13 @@ class DigitalHumanGenerator:
         """使用轮询方式监控任务完成"""
         start_time = time.time()
         last_check_time = 0
+        last_queue_check = 0
         check_interval = 5
+        queue_check_interval = 15  # 每15秒检查一次队列状态
         
+        print("=" * 60)
+        print(f"🔄 开始持续监控任务 - Prompt ID: {prompt_id}")
+        print(f"⏱️  监控超时: {timeout}秒")
         print("=" * 60)
         
         while time.time() - start_time < timeout:
@@ -708,7 +769,8 @@ class DigitalHumanGenerator:
                     with urllib.request.urlopen(url) as response:
                         history = json.loads(response.read().decode('utf-8'))
                         if prompt_id in history:
-                            print(f"\n✅ 任务已完成！ (用时: {int(current_time - start_time)}秒)")
+                            elapsed = int(current_time - start_time)
+                            print(f"\n✅ 任务已完成！ (总用时: {elapsed}秒)")
                             if auto_download:
                                 print("📥 开始下载输出文件...")
                                 return self.get_result_by_prompt_id(prompt_id, output_dir)
@@ -717,14 +779,58 @@ class DigitalHumanGenerator:
                     pass
                 
                 elapsed = int(current_time - start_time)
-                print(f"\r🔄 任务运行中... (已用时: {elapsed}秒)", end='', flush=True)
+                progress_bar = self._get_progress_bar(elapsed, timeout)
+                print(f"\r🔄 任务执行中 {progress_bar} (已用时: {elapsed}秒 / {timeout}秒)", end='', flush=True)
                 
                 last_check_time = current_time
             
+            # 定期检查队列状态以获取更多信息
+            if current_time - last_queue_check >= queue_check_interval:
+                try:
+                    queue_url = f"http://{self.server_address}/queue"
+                    with urllib.request.urlopen(queue_url) as response:
+                        queue_data = json.loads(response.read().decode('utf-8'))
+                        
+                        running_count = len(queue_data.get('queue_running', []))
+                        pending_count = len(queue_data.get('queue_pending', []))
+                        
+                        # 检查当前任务是否还在运行
+                        is_running = any(len(item) > 1 and item[1] == prompt_id for item in queue_data.get('queue_running', []))
+                        
+                        if is_running:
+                            print(f"\n📊 系统负载: 执行中 {running_count} | 等待中 {pending_count}")
+                            last_queue_check = current_time
+                except:
+                    pass
+            
             time.sleep(1)
         
-        print(f"\n⏰ 监控超时 ({timeout}秒)")
+        elapsed = int(current_time - start_time)
+        print(f"\n⏰ 监控超时 ({timeout}秒，实际用时: {elapsed}秒)")
         return False
+    
+    def _get_progress_bar(self, current: int, total: int, width: int = 30) -> str:
+        """生成进度条"""
+        if total <= 0:
+            return "[" + "=" * width + "]"
+        
+        progress = min(current / total, 1.0)
+        filled = int(width * progress)
+        bar = "=" * filled + "-" * (width - filled)
+        percentage = int(progress * 100)
+        return f"[{bar}] {percentage}%"
+    
+    def get_results(self, prompt_id: str) -> Optional[Dict[str, Any]]:
+        """获取工作流执行结果 - 委托给 workflow_client"""
+        return self.workflow_client.get_results(prompt_id)
+    
+    def extract_output_files(self, result: Dict[str, Any]) -> Dict[str, list]:
+        """从结果中提取输出文件信息 - 委托给 workflow_client"""
+        return self.workflow_client.extract_output_files(result)
+    
+    def download_file(self, file_info: Dict[str, Any], save_path: str) -> bool:
+        """下载生成的文件 - 委托给 workflow_client"""
+        return self.workflow_client.download_file(file_info, save_path)
     
     def get_result_by_prompt_id(self, prompt_id: str, output_dir: str = "outputs") -> bool:
         """根据prompt_id获取执行结果并下载文件"""

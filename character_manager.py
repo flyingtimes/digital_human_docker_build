@@ -197,7 +197,8 @@ class CharacterManagerCLI:
         success = self.generator.monitor_progress_only(
             prompt_id=prompt_id,
             timeout=args.timeout,
-            auto_download=not args.no_download
+            auto_download=not args.no_download,
+            continuous=args.continuous
         )
         
         if success:
@@ -385,6 +386,7 @@ python character_manager.py generate {character_name} "要生成的文本内容"
         monitor_parser.add_argument('prompt_id', help='任务ID')
         monitor_parser.add_argument('--timeout', type=int, default=600, help='超时时间（秒）')
         monitor_parser.add_argument('--no-download', action='store_true', help='不自动下载结果')
+        monitor_parser.add_argument('--continuous', '-c', action='store_true', help='持续监控直到任务完成（默认只检查当前状态）')
         
         # result 命令
         result_parser = subparsers.add_parser('result', help='获取任务结果')
